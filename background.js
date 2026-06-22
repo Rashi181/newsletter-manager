@@ -152,7 +152,7 @@ async function scanInbox(onProgress) {
   let allIds = [];
   let pageToken = undefined;
   let pages = 0;
-  const MAX_PAGES = 5; // ~500 emails max, keeps this fast for a v1
+  const MAX_PAGES = 10; // ~1000 emails max, keeps this fast for a v1
 
   do {
     let listResult;
@@ -283,17 +283,38 @@ function parseUnsubscribeLinks(headerValue) {
 async function unsubscribe(group) {
   const { http, mailto } = parseUnsubscribeLinks(group.listUnsubscribe);
 
-  // RFC 8058 one-click unsubscribe: POST to the link, no tab needed.
   if (group.oneClick && http) {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
       const res = await fetch(http, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "List-Unsubscribe=One-Click"
+        body: "List-Unsubscribe=One-Click",
+        signal: controller.signal,
+        credentials: "include"
       });
-      return { method: "one-click", success: res.ok };
+
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        // POST worked silently — best case, no tab needed
+        return { method: "one-click", success: true };
+      }
+
+      // POST reached server but server said no — try tab anyway
+      // (some servers accept GET on the same URL as a web form)
+      chrome.tabs.create({ url: http });
+      return { method: "link", success: true };
+
     } catch (e) {
-      // fall through to opening the link manually
+      // CORS block or network error — POST never reached server.
+      // Tab will work because browser sends cookies with normal navigation.
+      if (http) {
+        chrome.tabs.create({ url: http });
+        return { method: "link", success: true };
+      }
     }
   }
 

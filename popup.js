@@ -196,8 +196,9 @@ async function handleUnsubscribeClick() {
 
   if (response.ok && response.data.success) {
     els.unsubscribeBtn.textContent =
-      response.data.method === "one-click" ? "Unsubscribed ✓" : "Opened unsubscribe page ✓";
-  } else {
+      response.data.method === "one-click"
+        ? "Unsubscribed ✓"
+        : "Opened unsubscribe page ✓";
     els.unsubscribeBtn.textContent = "Couldn't unsubscribe";
     els.unsubscribeBtn.disabled = false;
   }
