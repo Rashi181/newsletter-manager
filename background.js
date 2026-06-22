@@ -10,10 +10,10 @@
 const GMAIL_API = "https://www.googleapis.com/gmail/v1/users/me";
 
 // -------------------- AUTH --------------------
-
+//get token from Google Oauth
 function getToken(interactive = true) {
   return new Promise((resolve, reject) => {
-    chrome.identity.getAuthToken({ interactive }, (token) => {
+    chrome.identity.getAuthToken({ interactive }, (token) => { //checks if user signed in or not and checks cached token  
       if (chrome.runtime.lastError || !token) {
         reject(chrome.runtime.lastError?.message || "No token received");
         return;
@@ -298,7 +298,102 @@ async function unsubscribe(group) {
   }
   return { method: "none", success: false };
 }
+// -------------------- DELETE --------------------
 
+async function deleteAllFromSender(group) {
+  let token = await getToken(false); // non-interactive — user already authed
+  let deleted = 0;
+
+  for (const msg of group.messages) {
+    try {
+      const res = await fetch(`${GMAIL_API}/messages/${msg.id}/trash`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) deleted++;
+    } catch (e) {
+      // skip failed individual deletes, continue with rest
+    }
+  }
+
+  // Update cache to remove this sender
+  const cached = await chrome.storage.local.get("newsletters");
+  if (cached.newsletters) {
+    const updated = cached.newsletters.filter(
+      (g) => g.senderEmail !== group.senderEmail
+    );
+    await chrome.storage.local.set({ newsletters: updated });
+  }
+
+  return { deleted, total: group.messages.length };
+}
+
+// -------------------- FETCH FULL EMAIL --------------------
+
+async function fetchFullMessage(messageId) {
+  let token = await getToken(false);
+
+  const res = await fetch(`${GMAIL_API}/messages/${messageId}?format=full`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!res.ok) throw new Error(`Failed to fetch message: ${res.status}`);
+  const data = await res.json();
+
+  // Extract body — emails can be plain text, HTML, or multipart.
+  // We walk the payload parts to find the best version.
+  function extractBody(payload) {
+    if (!payload) return "";
+
+    // Single-part message
+    if (payload.body?.data) {
+      return decodeBase64(payload.body.data);
+    }
+
+    // Multipart — prefer text/html, fall back to text/plain
+    if (payload.parts) {
+      let plainText = "";
+      let htmlText = "";
+      for (const part of payload.parts) {
+        if (part.mimeType === "text/html" && part.body?.data) {
+          htmlText = decodeBase64(part.body.data);
+        } else if (part.mimeType === "text/plain" && part.body?.data) {
+          plainText = decodeBase64(part.body.data);
+        } else if (part.parts) {
+          // nested multipart
+          const nested = extractBody(part);
+          if (nested) htmlText = htmlText || nested;
+        }
+      }
+      return htmlText || plainText;
+    }
+
+    return "";
+  }
+
+  function decodeBase64(data) {
+    // Gmail uses URL-safe base64
+    const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
+    try {
+      return decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+    } catch {
+      return atob(base64);
+    }
+  }
+
+  const headers = data.payload?.headers || [];
+  return {
+    subject: getHeader(headers, "Subject"),
+    from: getHeader(headers, "From"),
+    date: getHeader(headers, "Date"),
+    body: extractBody(data.payload)
+  };
+}
 // -------------------- MESSAGE ROUTER --------------------
 // The popup talks to this background script via chrome.runtime.sendMessage.
 
@@ -323,6 +418,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.storage.local.get(["newsletters", "lastScanned"]).then((data) => {
       sendResponse({ ok: true, data });
     });
+    return true;
+  }
+  if (request.action === "deleteAll") {
+    deleteAllFromSender(request.group)
+      .then((result) => sendResponse({ ok: true, data: result }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+    return true;
+  }
+
+  if (request.action === "fetchMessage") {
+    fetchFullMessage(request.messageId)
+      .then((result) => sendResponse({ ok: true, data: result }))
+      .catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true;
   }
 });

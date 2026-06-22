@@ -242,3 +242,80 @@ body {
   color: #666;
   line-height: 1.4;
 }
+
+#detail-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#delete-all-btn {
+  background: #fff3e0;
+  color: #e65100;
+  border: none;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+#delete-all-btn:hover {
+  background: #ffe0b2;
+}
+#delete-all-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* MAIL MODAL */
+#mail-modal {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  background: #fafafa;
+  z-index: 100;
+  overflow-y: auto;
+}
+
+#mail-modal-inner {
+  padding: 14px 16px;
+}
+
+#mail-modal-header {
+  margin-bottom: 12px;
+}
+
+#mail-modal-close {
+  background: none;
+  border: none;
+  color: #1a73e8;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+#mail-modal-subject {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+#mail-modal-meta {
+  font-size: 11.5px;
+  color: #888;
+  margin-bottom: 16px;
+}
+
+#mail-modal-body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #333;
+  word-break: break-word;
+}
+
+#mail-modal-body img {
+  max-width: 100%;
+  height: auto;
+}

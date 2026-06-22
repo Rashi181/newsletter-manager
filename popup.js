@@ -16,8 +16,16 @@ const els = {
   unsubscribeBtn: document.getElementById("unsubscribe-btn"),
   detailSenderName: document.getElementById("detail-sender-name"),
   detailSenderMeta: document.getElementById("detail-sender-meta"),
-  detailMessageList: document.getElementById("detail-message-list")
+  detailMessageList: document.getElementById("detail-message-list"),
+  deleteAllBtn: document.getElementById("delete-all-btn"),
+  mailModal: document.getElementById("mail-modal"),
+  mailModalClose: document.getElementById("mail-modal-close"),
+  mailModalSubject: document.getElementById("mail-modal-subject"),
+  mailModalMeta: document.getElementById("mail-modal-meta"),
+  mailModalBody: document.getElementById("mail-modal-body")
 };
+
+// -------------------- INIT --------------------
 
 document.addEventListener("DOMContentLoaded", async () => {
   const cached = await chrome.runtime.sendMessage({ action: "getCached" });
@@ -34,6 +42,8 @@ els.refreshBtn.addEventListener("click", runScan);
 els.scanBtn.addEventListener("click", runScan);
 els.backBtn.addEventListener("click", showListView);
 els.unsubscribeBtn.addEventListener("click", handleUnsubscribeClick);
+els.deleteAllBtn.addEventListener("click", handleDeleteAllClick);
+els.mailModalClose.addEventListener("click", closeMailModal);
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.action === "scanProgress") {
@@ -45,6 +55,8 @@ chrome.runtime.onMessage.addListener((msg) => {
     }
   }
 });
+
+// -------------------- SCAN --------------------
 
 async function runScan() {
   els.refreshBtn.classList.add("spinning");
@@ -69,6 +81,8 @@ async function runScan() {
     els.emptyState.classList.remove("hidden");
   }
 }
+
+// -------------------- LIST VIEW --------------------
 
 function getCategories() {
   const cats = new Set(currentData.map((g) => g.category));
@@ -122,6 +136,8 @@ function renderCategoryFilters() {
   }
 }
 
+// -------------------- DETAIL VIEW --------------------
+
 function showDetailView(group) {
   activeGroup = group;
   els.listView.classList.add("hidden");
@@ -132,16 +148,20 @@ function showDetailView(group) {
 
   els.unsubscribeBtn.disabled = false;
   els.unsubscribeBtn.textContent = "Unsubscribe";
+  els.deleteAllBtn.disabled = false;
+  els.deleteAllBtn.textContent = "🗑 Delete All";
 
   els.detailMessageList.innerHTML = "";
   for (const msg of group.messages) {
     const li = document.createElement("li");
     li.className = "detail-message-item";
+    li.style.cursor = "pointer";
     li.innerHTML = `
       <div class="detail-message-subject">${escapeHtml(msg.subject || "(no subject)")}</div>
       <div class="detail-message-date">${formatDate(msg.date)}</div>
       <div class="detail-message-snippet">${escapeHtml(msg.snippet || "")}</div>
     `;
+    li.addEventListener("click", () => openMailModal(msg));
     els.detailMessageList.appendChild(li);
   }
 }
@@ -151,6 +171,8 @@ function showListView() {
   els.listView.classList.remove("hidden");
   activeGroup = null;
 }
+
+// -------------------- UNSUBSCRIBE --------------------
 
 async function handleUnsubscribeClick() {
   if (!activeGroup) return;
@@ -170,6 +192,80 @@ async function handleUnsubscribeClick() {
     els.unsubscribeBtn.disabled = false;
   }
 }
+
+// -------------------- DELETE --------------------
+
+async function handleDeleteAllClick() {
+  if (!activeGroup) return;
+  const confirmed = confirm(
+    `Delete all ${activeGroup.count} emails from ${activeGroup.senderName}? This moves them to Trash.`
+  );
+  if (!confirmed) return;
+
+  els.deleteAllBtn.disabled = true;
+  els.deleteAllBtn.textContent = "Deleting…";
+
+  const response = await chrome.runtime.sendMessage({
+    action: "deleteAll",
+    group: activeGroup
+  });
+
+  if (response.ok) {
+    els.deleteAllBtn.textContent = `Deleted ${response.data.deleted} ✓`;
+    currentData = currentData.filter(
+      (g) => g.senderEmail !== activeGroup.senderEmail
+    );
+    setTimeout(() => showListView(), 1200);
+  } else {
+    els.deleteAllBtn.textContent = "Delete failed";
+    els.deleteAllBtn.disabled = false;
+  }
+}
+
+// -------------------- MAIL READER --------------------
+
+async function openMailModal(msg) {
+  els.mailModalSubject.textContent = msg.subject || "(no subject)";
+  els.mailModalMeta.textContent = formatDate(msg.date);
+  els.mailModalBody.innerHTML = "<p style='color:#aaa'>Loading…</p>";
+  els.mailModal.classList.remove("hidden");
+
+  const response = await chrome.runtime.sendMessage({
+    action: "fetchMessage",
+    messageId: msg.id
+  });
+
+  if (!response.ok) {
+    els.mailModalBody.innerHTML = "<p style='color:#e33'>Could not load email body.</p>";
+    return;
+  }
+
+  const { body, from, date } = response.data;
+  els.mailModalMeta.textContent = `From: ${from} · ${formatDate(date)}`;
+
+  if (body && body.includes("<")) {
+    const iframe = document.createElement("iframe");
+    iframe.sandbox = "allow-same-origin";
+    iframe.style.cssText = "width:100%;border:none;min-height:400px;";
+    els.mailModalBody.innerHTML = "";
+    els.mailModalBody.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(body);
+    iframe.contentDocument.close();
+    iframe.onload = () => {
+      iframe.style.height = iframe.contentDocument.body.scrollHeight + "px";
+    };
+  } else {
+    els.mailModalBody.innerHTML = `<pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(body || "No content found.")}</pre>`;
+  }
+}
+
+function closeMailModal() {
+  els.mailModal.classList.add("hidden");
+  els.mailModalBody.innerHTML = "";
+}
+
+// -------------------- HELPERS --------------------
 
 function setStatus(text) {
   els.statusBar.textContent = text;

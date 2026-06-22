@@ -26,13 +26,26 @@
     <section id="detail-view" class="hidden">
       <div id="detail-header">
         <button id="back-btn">← Back</button>
-        <button id="unsubscribe-btn">Unsubscribe</button>
+        <div id="detail-actions">
+         <button id="unsubscribe-btn">Unsubscribe</button>
+         <button id="delete-all-btn">🗑 Delete All</button>
+        </div>
       </div>
       <h2 id="detail-sender-name"></h2>
       <p id="detail-sender-meta"></p>
       <ul id="detail-message-list"></ul>
     </section>
-
+    <!-- MAIL READER MODAL -->
+    <div id="mail-modal" class="hidden">
+    <div id="mail-modal-inner">
+    <div id="mail-modal-header">
+      <button id="mail-modal-close">← Back</button>
+        </div>
+        <h2 id="mail-modal-subject"></h2>
+        <p id="mail-modal-meta"></p>
+        <div id="mail-modal-body"></div>
+     </div>
+    </div>
   </div>
 
   <script src="popup.js"></script>
