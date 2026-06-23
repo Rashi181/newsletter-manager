@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Newsletter Manager",
+  "name": "Inbox Sweeper",
   "version": "1.0.0",
   "description": "See every newsletter in your Gmail, how often it lands, and unsubscribe in one click.",
-  "permissions": ["identity", "storage"],
+  "permissions": ["identity", "storage", "sidePanel"],
   "host_permissions": ["https://www.googleapis.com/*"],
   "oauth2": {
     "client_id": "529773752779-3h9snos7a0lngo13lfpllmle5tmjg41q.apps.googleusercontent.com",
@@ -13,12 +13,14 @@
     ]
   },
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/envelope.png",
      "48": "icons/heart.png",
       "128": "icons/menu-burger.png"
     }
+  },
+   "side_panel": {
+    "default_path": "sidePanel.html"
   },
   "icons": {
     "16": "icons/envelope.png",

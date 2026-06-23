@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Newsletter Manager</title>
-  <link rel="stylesheet" href="popup.css" />
+  <title>Inbox Sweeper</title>
+  <link rel="stylesheet" href="sidePanel.css" />
 </head>
 <body>
   <div id="app">
 
     <header id="topbar">
-      <h1 id="app-title">📬 Newsletters</h1>
+      <h1 id="app-title">📬 Inbox</h1>
       <button id="refresh-btn" title="Rescan inbox">⟳</button>
     </header>
 
@@ -18,7 +18,7 @@
       <div id="category-filters"></div>
       <ul id="newsletter-list"></ul>
       <div id="empty-state" class="hidden">
-        <p>No newsletters found yet.</p>
+        <p>No clutter found yet.</p>
         <button id="scan-btn">Scan my inbox</button>
       </div>
     </section>
@@ -48,6 +48,6 @@
     </div>
   </div>
 
-  <script src="popup.js"></script>
+  <script src="sidePanel.js"></script>
 </body>
 </html>

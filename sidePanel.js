@@ -1,4 +1,3 @@
-// popup.js
 let currentData = [];
 let activeCategory = "All";
 let activeGroup = null;

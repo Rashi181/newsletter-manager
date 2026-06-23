@@ -9,6 +9,8 @@
 
 const GMAIL_API = "https://www.googleapis.com/gmail/v1/users/me";
 
+
+
 // -------------------- AUTH --------------------
 //get token from Google Oauth
 function getToken(interactive = true) {
@@ -147,7 +149,7 @@ async function scanInbox(onProgress) {
   // Only look at emails with a List-Unsubscribe header. Gmail search
   // doesn't support filtering by header directly, so we pull a window
   // of recent mail and filter client-side.
-  const query = "newer_than:180d";
+  const query = "newer_than:180d"; //fetches mails which you have gotten in the last 6 months and then distinguishes between promotional and important emails
 
   let allIds = [];
   let pageToken = undefined;
@@ -463,4 +465,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: String(err) }));
     return true;
   }
+});
+
+
+chrome.runtime.onStartup?.addListener(() => {
+  chrome.sidePanel.setPanelBehavior({
+    openPanelOnActionClick: true
+  });
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel.setPanelBehavior({
+    openPanelOnActionClick: true
+  });
 });
