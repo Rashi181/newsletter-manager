@@ -58,8 +58,7 @@ async function getMessageMetadata(token, id) {
   ["From", "Subject", "Date", "List-Unsubscribe", "List-Unsubscribe-Post"].forEach((h) =>
     url.searchParams.append("metadataHeaders", h)
   );
-  url.searchParams.set("fields", "id,threadId,labelIds,snippet,payload");
-
+url.searchParams.set("fields", "id,threadId,historyId,labelIds,snippet,payload");
 
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` }
@@ -125,6 +124,10 @@ const CATEGORY_RULES = [
   {
     category: "Education",
     keywords: ["course", "udemy", "coursera", "university", "school", "learn", "edu", "academy"]
+  },
+  {
+    category: "Career",
+    keywords: ["swe",,"apply","internship","intern",  "hiring", "recruiter", "application"]
   }
 ];
 
@@ -146,10 +149,20 @@ function guessCategory(senderName, senderEmail, subject) {
 async function scanInbox(onProgress) {
   let token = await getToken(true);
 
-  // Only look at emails with a List-Unsubscribe header. Gmail search
-  // doesn't support filtering by header directly, so we pull a window
-  // of recent mail and filter client-side.
-  const query = "newer_than:180d"; //fetches mails which you have gotten in the last 6 months and then distinguishes between promotional and important emails
+  const cached = await chrome.storage.local.get("lastScanned");
+
+  let query;
+
+  if (cached.lastScanned) {
+    const unixSeconds = Math.floor(
+      cached.lastScanned / 1000
+    );
+
+    query = `after:${unixSeconds}`;
+  } else {
+    query = "newer_than:180d";
+  }
+
 
   let allIds = [];
   let pageToken = undefined;
@@ -178,7 +191,7 @@ async function scanInbox(onProgress) {
 
   // Fetch metadata for each message. We batch these with a concurrency
   // limit so we don't hammer the API or hit rate limits.
-  const CONCURRENCY = 10;
+  const CONCURRENCY = 30;
   const newsletterMessages = [];
   let processed = 0;
 
@@ -208,6 +221,7 @@ async function scanInbox(onProgress) {
       newsletterMessages.push({
         id: data.id,
         threadId: data.threadId,
+        historyId: data.historyId,
         from: getHeader(headers, "From"),
         subject: getHeader(headers, "Subject"),
         date: getHeader(headers, "Date"),
@@ -260,14 +274,65 @@ async function scanInbox(onProgress) {
 
   const result = Object.values(groups).sort((a, b) => b.count - a.count);
 
-  // Cache it so the popup can show data instantly next time,
-  // with a timestamp so we know how fresh it is.
+  // ---- MERGE with existing cache ----
+  const cachedData = await chrome.storage.local.get("newsletters");
+  const existing = cachedData.newsletters || [];
+
+  // Build a lookup map from existing cache
+  const merged = {};
+  for (const group of existing) {
+    merged[group.senderEmail] = group;
+  }
+
+  // Merge new scan results in
+  for (const group of result) {
+    if (!merged[group.senderEmail]) {
+      // Brand new sender not seen before
+      merged[group.senderEmail] = group;
+      continue;
+    }
+
+    const existingGroup = merged[group.senderEmail];
+
+    // Add new messages in, then deduplicate by message id
+    existingGroup.messages.push(...group.messages);
+    const seen = new Set();
+    existingGroup.messages = existingGroup.messages.filter(msg => {
+      if (seen.has(msg.id)) return false;
+      seen.add(msg.id);
+      return true;
+    });
+
+    // Recount from actual messages (more accurate than adding)
+    existingGroup.count = existingGroup.messages.length;
+    existingGroup.unreadCount = existingGroup.messages.filter(m => m.unread).length;
+
+    // Update unsubscribe info in case it changed
+    existingGroup.listUnsubscribe = group.listUnsubscribe;
+    existingGroup.oneClick = group.oneClick;
+
+    // Re-sort: unread first, then newest
+    existingGroup.messages.sort((a, b) => {
+      if (b.unread !== a.unread) return b.unread ? 1 : -1;
+      return new Date(b.date) - new Date(a.date);
+    });
+  }
+
+  const finalResult = Object.values(merged).sort((a, b) => b.count - a.count);
+
+  // ---- Save newest historyId for incremental scans ----
+  const newestHistoryId = newsletterMessages
+    .map(m => Number(m.historyId))
+    .filter(Boolean)
+    .sort((a, b) => b - a)[0];
+
   await chrome.storage.local.set({
-    newsletters: result,
-    lastScanned: Date.now()
+    newsletters: finalResult,
+    lastScanned: Date.now(),
+    lastHistoryId: newestHistoryId || null
   });
 
-  return result;
+  return finalResult;
 }
 
 // -------------------- UNSUBSCRIBE --------------------
