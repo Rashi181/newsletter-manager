@@ -225,7 +225,10 @@ async function handleDeleteAllClick() {
     currentData = currentData.filter(
       (g) => g.senderEmail !== activeGroup.senderEmail
     );
-    setTimeout(() => showListView(), 1200);
+  setTimeout(() => {
+    showListView();
+    renderList();}, 
+    400);
   } else {
     els.deleteAllBtn.textContent = "Delete failed";
     els.deleteAllBtn.disabled = false;

@@ -360,3 +360,32 @@ body {
   background: #d0d0d0;
   border-radius: 8px;
 }
+
+unread-badge {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #1a73e8;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.unread-count {
+  font-size: 11px;
+  background: #1a73e8;
+  color: white;
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-right: 8px;
+}
+.detail-unread-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #1a73e8;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.is-unread {
+  border-left: 4px solid #1a73e8;
+  background: #f5f8ff;
+}
